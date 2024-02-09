@@ -5,7 +5,7 @@ from selenium.common.exceptions import WebDriverException
 
 from dotenv import load_dotenv
 
-from src.trading212 import browser_utils
+from trading121.utils import browser_utils
 
 
 @fixture(scope="function")
@@ -21,7 +21,7 @@ def driver():
     with patch.object(browser_utils.Driver, "load") as mock_driver:
         mock_driver.return_value = driver
         yield driver
-        driver.close()
+        driver.quit()
 
 
 def clear_browser(driver):
@@ -29,5 +29,5 @@ def clear_browser(driver):
     try:
         driver.execute_script('localStorage.clear();')
     except WebDriverException as err:
-        if "storage is disabled inside 'data:'" not in err.args[0].lower():
+        if "storage is disabled inside 'data:'" not in err.msg.lower():
             raise Exception("Could not clear local storage") from err

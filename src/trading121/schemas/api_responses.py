@@ -1,7 +1,8 @@
-from typing import List, Dict, Optional, Union
-from pydantic import BaseModel, ValidationError
+from typing import Optional, Union
 from typing import List, Dict
 from pydantic import BaseModel
+
+from trading121.constants import VALUE_UNAVAILABLE
 
 
 class Item(BaseModel):
@@ -17,10 +18,10 @@ class Item(BaseModel):
     margin: float
     ppl: float
     quantity: float
-    maxBuy: Optional[float]
-    maxSell: Optional[float]
-    maxOpenBuy: Optional[float]
-    maxOpenSell: Optional[float]
+    maxBuy: Optional[float] = VALUE_UNAVAILABLE
+    maxSell: Optional[float] = VALUE_UNAVAILABLE
+    maxOpenBuy: Optional[float] = VALUE_UNAVAILABLE
+    maxOpenSell: Optional[float] = VALUE_UNAVAILABLE
     frontend: str
     autoInvestQuantity: float
     fxPpl: float
@@ -80,13 +81,14 @@ class Position(BaseModel):
     margin: float
     ppl: float
     quantity: float
-    maxBuy: Optional[float]
-    maxSell: Optional[float]
-    maxOpenBuy: Optional[float]
-    maxOpenSell: Optional[float]
+    maxBuy: Optional[float] = VALUE_UNAVAILABLE
+    maxSell: Optional[float] = VALUE_UNAVAILABLE
+    maxOpenBuy: Optional[float] = VALUE_UNAVAILABLE
+    maxOpenSell: Optional[float] = VALUE_UNAVAILABLE
     frontend: str
     autoInvestQuantity: float
     fxPpl: float
+
 
 class EquityValueOrder(BaseModel):
     orderId: str
@@ -98,6 +100,7 @@ class EquityValueOrder(BaseModel):
     currencyCode: str
     created: str
     frontend: str
+
 
 class Account(BaseModel):
     dealer: str

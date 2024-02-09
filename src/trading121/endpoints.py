@@ -9,7 +9,7 @@ try:
     environment = getattr(Environment, environment)
 except AttributeError:
     raise EnvVarError(f"Set a valid environment variable for `TRADING212_ENVIRONMENT`. "
-                           f"Supported values are {', '.join(Environment.__members__)}.")
+                      f"Supported values are {', '.join(Environment.__members__)}.")
 
 
 HOME_URL = "https://www.trading212.com/"

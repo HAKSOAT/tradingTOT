@@ -1,7 +1,7 @@
 import os
 import time
 
-from src.trading212.browser_utils import login_trading212, get_login_token
+from trading121.utils.browser_utils import login_trading212, get_login_token
 from tests.conftest import clear_browser
 
 

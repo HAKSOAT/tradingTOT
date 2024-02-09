@@ -3,14 +3,14 @@ from typing import Union, Dict, Optional
 
 from requests.sessions import Session
 
-from .exceptions import BrokerOrderError, OrderOperationError
+from .exceptions import BrokerOrderError
 from .endpoints import (VALIDATE_URL, PLACE_ORDER_URL,
                         ORDER_COSTS_URL, TICKER_PRICE_URL, ACCOUNT_SUMMARY_URL,
                         ORDER_HISTORY, ALGOLIA_CONFIG_URL, ALGOLIA_SEARCH_URL)
 from .enums import OrderStatus, OrderType
 
 from .existing_orders import ExistingOrdersHandler
-from .browser_utils import enforce_auth
+from trading121.utils.browser_utils import enforce_auth
 
 
 # The value is randomly chosen as I am yet to observe an increment more than that.
@@ -289,3 +289,7 @@ class Trading212:
         }
 
         return details
+
+    # TODO: Create a function to make any call to any trading212 url for experts.
+    # TODO: Add logging of results make to each api call.
+    # TODO: Allow enforce auth take in a custom Driver.

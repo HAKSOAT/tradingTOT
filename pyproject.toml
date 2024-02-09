@@ -9,12 +9,12 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.8"
 poethepoet = "^0.24.4"
-selenium = "3.141.0"
+selenium = "4.11.2"
 requests = "2.31.0"
-webdriver-manager = "3.8.6"
 selenium-stealth = "^1.0.6"
 pydantic = "^2.5.2"
 urllib3 = "1.26.18"
+pytest-order = "^1.2.0"
 
 
 [tool.poetry.group.dev.dependencies]

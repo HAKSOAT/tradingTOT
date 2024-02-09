@@ -1,58 +1,68 @@
 import os
-import time
+import re
+from pathlib import Path
+from functools import wraps
 from typing import Dict, Callable, Union
 
 import requests
 from requests.exceptions import ConnectionError
 from selenium import webdriver
+from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.webdriver import WebDriver
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 from selenium_stealth import stealth
-from webdriver_manager.chrome import ChromeDriverManager
-from webdriver_manager.core.utils import ChromeType
 
-from .exceptions import AuthError
-from .endpoints import HOME_URL, AUTHENTICATE_URL
+from trading121.enums import Environment
+from trading121.exceptions import AuthError
+from trading121.endpoints import HOME_URL, AUTHENTICATE_URL
 
 
 class Driver:
     driver = None
 
     @classmethod
-    def load(cls) -> WebDriver:
+    def load(cls, force_new=False) -> WebDriver:
         """Create a headless driver with needed properties to load Trading212.
 
         Returns:
             Selenium Webdriver
         """
+        if force_new:
+            if isinstance(cls.driver, WebDriver):
+                cls.driver.quit()
+                cls.driver = None
+
         if cls.driver:
             return cls.driver
 
         options = webdriver.ChromeOptions()
+
         # export CHROME_VERSION="114.0.5735.90" && wget --no-verbose -O /tmp/chrome.deb https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_${CHROME_VERSION}-1_amd64.deb && apt install -y /tmp/chrome.deb && rm /tmp/chrome.deb
-        options.binary_location = "/usr/bin/google-chrome-stable"
-        options.add_argument('--no-sandbox')
+        # TODO: Extract binary location to env file
+        options.binary_location = "/Applications/Chromium.app/Contents/MacOS/Chromium"
+        options.add_argument(
+            'user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
+            'Chrome/102.0.5005.63 Safari/537.36'
+        )
+        scale = 2
+        width = 1680
+        height = 1050
+        options.add_argument(f"--window-size={width * scale},{height * scale}")
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument("--disable-extensions")
         options.add_argument("--headless")
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         options.add_experimental_option('useAutomationExtension', False)
 
-        driver_path = ChromeDriverManager(chrome_type=ChromeType.CHROMIUM, version="114.0.5735.90").install()
-        driver = webdriver.Chrome(driver_path, options=options)
-        stealth(driver,
-            languages=["en-US", "en"],
-            vendor="Google Inc.",
-            platform="Win32",
-            webgl_vendor="Intel Inc.",
-            renderer="Intel Iris OpenGL Engine",
+        driver = webdriver.Chrome(options=options)
+        stealth(
+            driver, languages=["en-US", "en"], vendor="Google Inc.",
+            platform="Win32", webgl_vendor="Intel Inc.", renderer="Intel Iris OpenGL Engine",
             fix_hairline=True,
         )
-        scale = 2
-        width = 1920
-        height = 1080
-        driver.set_window_size(width * scale, height * scale)
 
         cls.driver = driver
         return driver
@@ -85,17 +95,60 @@ def login_trading212(driver: WebDriver, email: str, password: str) -> WebDriver:
     Returns:
         Selenium Webdriver
     """
-    driver.get(HOME_URL)
+    retries = 5
+    while retries:
+        retries -= 1
+        try:
+            driver.get(HOME_URL)
+            break
+        except WebDriverException as err:
+            if "disconnected: not connected to devtools" in err.msg.lower():
+                driver = Driver.load(force_new=True)
+            else:
+                raise AuthError("Failed to load home page.") from err
+
+    # TODO: Switch this to a screenshot logging functionality
+    before_login_shot = Path("before_shot.png")
+    driver.save_screenshot(before_login_shot)
+
+    env_pattern = "|".join([e for e in Environment])
+    if re.search(env_pattern, driver.current_url):
+        print("Already logged in.")
+        return driver
+
     accept_cookies(driver)
 
+    actions = ActionChains(driver)
+
     login_link = driver.find_element(By.XPATH, "//p[starts-with(@class, 'Header_login-button')]")
-    login_link.click()
+    actions.move_to_element(login_link).click(login_link).perform()
+
+    actions = ActionChains(driver)
     email_input = driver.find_element(By.XPATH, "//input[@name='email' and @type='email']")
-    email_input.send_keys(email)
+    actions.move_to_element(email_input).click(email_input).send_keys(email).pause(0.5)
+
     password_input = driver.find_element(By.XPATH, "//input[@name='password' and @type='password']")
-    password_input.send_keys(password)
+    actions.move_to_element(password_input).click(password_input).send_keys(password).pause(0.5)
+
     login_button = driver.find_element(By.XPATH, "//input[@type='submit' and @value='Log in']")
-    login_button.click()
+    actions.move_to_element(login_button).click(login_button).pause(0.5)
+
+    actions.perform()
+
+    # The check below confirms page loaded fully. Wait time set based on observation.
+    max_wait_time = 30
+    try:
+        WebDriverWait(driver, max_wait_time).until(
+            EC.presence_of_element_located(
+                (By.XPATH, "//span[@class='account-status-header-label' and contains(text(), 'Account value')]")
+            )
+        )
+    except TimeoutException as err:
+        raise AuthError(f"Trading dashboard failed to load in {max_wait_time} seconds.") from err
+    finally:
+        after_login_shot = Path("after_shot.png")
+        driver.save_screenshot(after_login_shot)
+
     return driver
 
 
@@ -123,14 +176,11 @@ def generate_headers(driver: WebDriver) -> Dict:
 
     Returns:
     """
-    for trials in range(10):
+    for trials in range(5):
         duuid = get_duuid(driver)
         if duuid:
             break
-        time.sleep(3)
     else:
-        print(driver.page_source)
-        print(driver)
         raise Exception("DDUID Not Found")
 
     headers = {
@@ -166,6 +216,7 @@ def enforce_auth(func: Callable):
     Returns:
         A wrapper function.
     """
+    @wraps(func)
     def wrapper(*args, **kwargs):
         if not args and not kwargs:
             raise Exception("The wrapped function needs at least one argument.")
@@ -178,20 +229,23 @@ def enforce_auth(func: Callable):
         except ConnectionError:
             is_auth = False
 
+        retries = 5
         while not is_auth:
             driver = Driver.load()
             driver = login_trading212(driver, os.environ.get("TRADING212_EMAIL"),
                                       os.environ.get("TRADING212_PASSWORD"))
+
             headers = generate_headers(driver)
             auth_cookies = {'LOGIN_TOKEN': get_login_token(driver)}
-            driver.close()
             session = requests.Session()
             session.headers.update(headers)
             session.cookies.update(auth_cookies)
             instance.session = session
-
             auth_response = instance.session.get(AUTHENTICATE_URL)
             is_auth = True if auth_response.status_code == 200 else False
+
+        if not is_auth and not retries:
+            raise AuthError("Failed to log in using Selenium.")
 
         if kwargs.get("self"):
             kwargs["self"] = instance

@@ -1,4 +1,4 @@
-from typing import Union, Dict
+from typing import Union, Dict, List
 
 import requests
 from requests.models import Response
@@ -12,7 +12,7 @@ class ExistingOrdersHandler:
     def __init__(self, session):
         self.session = session
 
-    def from_summary(self, response: Union[Response, Dict, None] = None) -> Dict:
+    def from_summary(self, response: Union[Response, Dict, None] = None) -> List:
         """Extracts existing orders using the Trading212 summary response or endpoint.
 
         Args:
@@ -27,11 +27,11 @@ class ExistingOrdersHandler:
         if isinstance(response, requests.models.Response):
             response = response.json()
 
-        SummarySchema.validate(response)
+        SummarySchema.model_validate(response)
         existing_orders = response.get("valueOrders", {}).get("items", [])
         return existing_orders
 
-    def from_execution_response(self, response: Union[Response, Dict]) -> Dict:
+    def from_execution_response(self, response: Union[Response, Dict]) -> List:
         """Extracts existing orders using the response from placing an order.
 
         Args:
@@ -42,6 +42,6 @@ class ExistingOrdersHandler:
         if isinstance(response, requests.models.Response):
             response = response.json()
 
-        AfterOrderSchema.validate(response)
+        AfterOrderSchema.model_validate(response)
         existing_orders = response.get("account", {}).get("equityValueOrders", [])
         return existing_orders
