@@ -14,6 +14,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium_stealth import stealth
+from tenacity import retry, stop_after_attempt
 
 from trading121.enums import Environment
 from trading121.exceptions import AuthError
@@ -77,12 +78,22 @@ def accept_cookies(driver: WebDriver) -> None:
     Returns:
     """
     try:
-        accept_cookies = driver.find_element(By.XPATH, "//p[text()='Accept all cookies']")
-        accept_cookies.click()
-    except (TimeoutException, NoSuchElementException):
-        raise AuthError("Unable to accept cookies")
+        driver.save_screenshot("accept-cookies.png")
+        accept_button = driver.find_element(By.XPATH, "//p[text()='Accept all cookies']")
+        accept_button.click()
+    except NoSuchElementException:
+        try:
+            login_nav_xpath = "//p[starts-with(@class, 'Header_login-button')]"
+            max_wait_time = 3
+            WebDriverWait(driver, max_wait_time).until(
+                EC.element_to_be_clickable((By.XPATH, login_nav_xpath))
+            )
+        except TimeoutException:
+            raise AuthError("Unable to accept cookies")
 
 
+# Retrying because Trading212 sometimes comes up with a "something went wrong" error.
+@retry(stop=stop_after_attempt(3))
 def login_trading212(driver: WebDriver, email: str, password: str) -> WebDriver:
     """
     Login to a Trading212 account.
@@ -95,20 +106,21 @@ def login_trading212(driver: WebDriver, email: str, password: str) -> WebDriver:
     Returns:
         Selenium Webdriver
     """
-    retries = 5
+    retries = 3
     while retries:
         retries -= 1
         try:
             driver.get(HOME_URL)
             break
         except WebDriverException as err:
+            # Sometimes the browser becomes inaccessible, especially after long periods of non-use.
             if "disconnected: not connected to devtools" in err.msg.lower():
                 driver = Driver.load(force_new=True)
             else:
                 raise AuthError("Failed to load home page.") from err
 
     # TODO: Switch this to a screenshot logging functionality
-    before_login_shot = Path("before_shot.png")
+    before_login_shot = Path("before_login_shot.png")
     driver.save_screenshot(before_login_shot)
 
     env_pattern = "|".join([e for e in Environment])
@@ -125,13 +137,13 @@ def login_trading212(driver: WebDriver, email: str, password: str) -> WebDriver:
 
     actions = ActionChains(driver)
     email_input = driver.find_element(By.XPATH, "//input[@name='email' and @type='email']")
-    actions.move_to_element(email_input).click(email_input).send_keys(email).pause(0.5)
+    actions.move_to_element(email_input).click(email_input).send_keys(email).pause(0.1)
 
     password_input = driver.find_element(By.XPATH, "//input[@name='password' and @type='password']")
-    actions.move_to_element(password_input).click(password_input).send_keys(password).pause(0.5)
+    actions.move_to_element(password_input).click(password_input).send_keys(password).pause(0.1)
 
     login_button = driver.find_element(By.XPATH, "//input[@type='submit' and @value='Log in']")
-    actions.move_to_element(login_button).click(login_button).pause(0.5)
+    actions.move_to_element(login_button).click(login_button).pause(0.1)
 
     actions.perform()
 
@@ -146,7 +158,7 @@ def login_trading212(driver: WebDriver, email: str, password: str) -> WebDriver:
     except TimeoutException as err:
         raise AuthError(f"Trading dashboard failed to load in {max_wait_time} seconds.") from err
     finally:
-        after_login_shot = Path("after_shot.png")
+        after_login_shot = Path("after_login_shot.png")
         driver.save_screenshot(after_login_shot)
 
     return driver
@@ -176,11 +188,8 @@ def generate_headers(driver: WebDriver) -> Dict:
 
     Returns:
     """
-    for trials in range(5):
-        duuid = get_duuid(driver)
-        if duuid:
-            break
-    else:
+    duuid = get_duuid(driver)
+    if not duuid:
         raise Exception("DDUID Not Found")
 
     headers = {
@@ -229,8 +238,10 @@ def enforce_auth(func: Callable):
         except ConnectionError:
             is_auth = False
 
-        retries = 5
-        while not is_auth:
+        # TODO: Store headers in a local cache and load from there initially.
+        retries = 3
+        while not is_auth and retries:
+            retries -= 1
             driver = Driver.load()
             driver = login_trading212(driver, os.environ.get("TRADING212_EMAIL"),
                                       os.environ.get("TRADING212_PASSWORD"))

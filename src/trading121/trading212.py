@@ -1,15 +1,16 @@
 from threading import Lock
-from typing import Union, Dict, Optional
+from typing import Union, Dict, Optional, Set, List
 
 from requests.sessions import Session
 
-from .exceptions import BrokerOrderError
-from .endpoints import (VALIDATE_URL, PLACE_ORDER_URL,
+from trading121.schemas.api_responses import Position, SummarySchema
+from trading121.exceptions import BrokerOrderError
+from trading121.endpoints import (VALIDATE_URL, PLACE_ORDER_URL,
                         ORDER_COSTS_URL, TICKER_PRICE_URL, ACCOUNT_SUMMARY_URL,
                         ORDER_HISTORY, ALGOLIA_CONFIG_URL, ALGOLIA_SEARCH_URL)
-from .enums import OrderStatus, OrderType
+from trading121.enums import OrderStatus, OrderType
 
-from .existing_orders import ExistingOrdersHandler
+from trading121.existing_orders import ExistingOrdersHandler
 from trading121.utils.browser_utils import enforce_auth
 
 
@@ -290,6 +291,30 @@ class Trading212:
 
         return details
 
+    def get_position(self, ticker: str) -> Optional[Dict]:
+        """Get the position of ticker."""
+        positions = self.get_positions({ticker})
+        if positions:
+            return positions[0]
+        else:
+            return None
+
+    @enforce_auth
+    def get_positions(self, tickers: Set[str]) -> List[Dict]:
+        """Get position data from all tickers."""
+        response = self.session.post(ACCOUNT_SUMMARY_URL, json=[]).json()
+        SummarySchema.model_validate(response)
+        positions = []
+
+        for position in response.get("open", {}).get("items", []):
+            ticker = position["code"].split("_", 1)[0]
+            if ticker in tickers:
+                Position.model_validate(position)
+                positions.append(position)
+
+        return positions
+
     # TODO: Create a function to make any call to any trading212 url for experts.
     # TODO: Add logging of results make to each api call.
     # TODO: Allow enforce auth take in a custom Driver.
+    # TODO: Use LLMs to make model changes during schema changes.

@@ -15,3 +15,7 @@ class OrderType(str, Enum):
 class Environment(str, Enum):
     demo = "demo"
     live = "live"
+
+
+class FailureTypes(str, Enum):
+    InsufficientValueForStocksSell = "InsufficientValueForStocksSell"

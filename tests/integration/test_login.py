@@ -19,7 +19,7 @@ def test_login_correct_details(driver, test_env):
 
     # Waiting till the browser's page changes as the change does not happen immediately and this may lead to the
     # failure of the token extraction.
-    max_wait = 5
+    max_wait = 3
     while max_wait or (driver.current_url not in TRADING212_URLS):
         time.sleep(1)
         max_wait -= 1

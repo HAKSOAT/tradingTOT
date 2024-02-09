@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from trading121.constants import VALUE_UNAVAILABLE
 
 
-class Item(BaseModel):
+class Position(BaseModel):
     positionId: str
     humanId: str
     created: str
@@ -29,7 +29,7 @@ class Item(BaseModel):
 
 class Open(BaseModel):
     unfilteredCount: int
-    items: List[Item]
+    items: List[Position]
 
 
 class Cash(BaseModel):
@@ -66,28 +66,6 @@ class SummarySchema(BaseModel):
     open: Open
     orders: Orders
     valueOrders: ValueOrders
-
-
-class Position(BaseModel):
-    positionId: str
-    humanId: str
-    created: str
-    averagePrice: float
-    averagePriceConverted: float
-    currentPrice: float
-    value: float
-    investment: float
-    code: str
-    margin: float
-    ppl: float
-    quantity: float
-    maxBuy: Optional[float] = VALUE_UNAVAILABLE
-    maxSell: Optional[float] = VALUE_UNAVAILABLE
-    maxOpenBuy: Optional[float] = VALUE_UNAVAILABLE
-    maxOpenSell: Optional[float] = VALUE_UNAVAILABLE
-    frontend: str
-    autoInvestQuantity: float
-    fxPpl: float
 
 
 class EquityValueOrder(BaseModel):

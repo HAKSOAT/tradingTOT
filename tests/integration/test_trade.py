@@ -1,18 +1,12 @@
-from collections import defaultdict
-
-import pytest
-
 from src.trading121.trading212 import Trading212
-from src.trading121.enums import OrderType, OrderStatus
+from src.trading121.enums import OrderType, OrderStatus, FailureTypes
+from src.trading121.exceptions import BrokerOrderError
 from src.trading121.constants import VALUE_UNAVAILABLE
 
 TRADING212_URLS = ["https://live.trading212.com/", "https://demo.trading212.com/"]
 TICKER = "MSFT"
 
-FUNC_STATE = defaultdict(dict)
 
-
-@pytest.mark.order(1)
 def test_buy_order_workflow(driver):
     trading212 = Trading212()
 
@@ -50,17 +44,18 @@ def test_buy_order_workflow(driver):
 
     if status["status"] == OrderStatus.SUBMITTED:
         trading212.cancel_order(order_id)
-        FUNC_STATE[test_buy_order_workflow.__name__][order_id] = {"status": OrderStatus.SUBMITTED}
-    else:
-        FUNC_STATE[test_buy_order_workflow.__name__][order_id] = {"status": OrderStatus.COMPLETED}
 
 
-# Running this immediately (i.e. order=2) after `test_buy_order_workflow` because
-# selling equities depends on buying equities.
-@pytest.mark.order(2)
 def _test_sell_order_workflow(driver):
-    order_ids = FUNC_STATE[test_buy_order_workflow.__name__]
-    state = FUNC_STATE[test_buy_order_workflow.__name__].pop(order_ids[0])
+    trading212 = Trading212()
+
+    unreasonable_amount = 10000
+    try:
+        trading212.place_order(OrderType.SELL, amount=unreasonable_amount)
+    except BrokerOrderError as e:
+        expected_reason = FailureTypes.InsufficientValueForStocksSell
+        assert expected_reason.lower() in e.args[0].lower()
+
 
 
 
