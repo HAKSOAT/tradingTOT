@@ -38,14 +38,14 @@ class Trading212:
         self.object_id_to_ticker = {}
 
     @enforce_auth
-    def place_order(self, action: str, ticker: str, amount: Union[float, int]) -> Dict:
+    def place_order(self, action: Union[OrderType, str], ticker: str, amount: Union[float, int]) -> Dict:
         """
         Places an order.
 
         Args:
-            action:
-            ticker:
-            amount:
+            action: Order type
+            ticker: Ticker to trade
+            amount: The amount (currency not share quantity) to be used in the transaction.
 
         Returns:
 
@@ -105,7 +105,7 @@ class Trading212:
         Args:
             action: OrderType action.
             ticker: Ticker symbol.
-            amount: The amount to be used in the transaction.
+            amount: The amount (currency not share quantity) to be used in the transaction.
 
         Returns:
             Costs data.
@@ -240,6 +240,7 @@ class Trading212:
                 break
 
         response = response.json()
+        # TODO: Figure out what the difference between Rejected and Non existent order ids is.
         fill_details = response.get("sections", [])
         if not fill_details:
             return {"status": OrderStatus.REJECTED}
@@ -264,6 +265,9 @@ class Trading212:
 
             if description["key"] == "history.details.order.fill.quantity.key" and details["context"]:
                 fill_quantity = details["context"]["quantity"]
+
+        if fill_price is None:
+            return {"status": OrderStatus.CANCELLED}
 
         fill_price /= exchange_rate
 

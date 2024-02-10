@@ -1,6 +1,8 @@
 import os
 import time
 
+import pytest
+
 from trading121.utils.browser_utils import login_trading212, get_login_token
 from tests.conftest import clear_browser
 
@@ -8,6 +10,7 @@ from tests.conftest import clear_browser
 TRADING212_URLS = ["https://live.trading212.com/", "https://demo.trading212.com/"]
 
 
+@pytest.mark.order("first")
 def test_login_correct_details(driver, test_env):
     username = os.environ["TRADING212_EMAIL"]
     password = os.environ["TRADING212_PASSWORD"]
@@ -25,7 +28,3 @@ def test_login_correct_details(driver, test_env):
         max_wait -= 1
 
     assert get_login_token(driver) is not None
-
-
-def test_buy_order_workflow():
-    pass

@@ -1,7 +1,9 @@
-from src.trading121.trading212 import Trading212
-from src.trading121.enums import OrderType, OrderStatus, FailureTypes
-from src.trading121.exceptions import BrokerOrderError
-from src.trading121.constants import VALUE_UNAVAILABLE
+import time
+
+from trading121.trading212 import Trading212
+from trading121.enums import OrderType, OrderStatus, FailureTypes
+from trading121.exceptions import BrokerOrderError
+from trading121.constants import VALUE_UNAVAILABLE
 
 TRADING212_URLS = ["https://live.trading212.com/", "https://demo.trading212.com/"]
 TICKER = "MSFT"
@@ -39,35 +41,59 @@ def test_buy_order_workflow(driver):
     )
 
     status = trading212.get_status(order_id)
-    assert (status["status"] in OrderStatus.__members__.values() and
-            status["status"] in [OrderStatus.SUBMITTED, OrderStatus.COMPLETED])
+    assert status["status"] in [OrderStatus.SUBMITTED, OrderStatus.COMPLETED]
 
     if status["status"] == OrderStatus.SUBMITTED:
         trading212.cancel_order(order_id)
+        assert trading212.get_status(order_id)["status"] == OrderStatus.CANCELLED
 
 
-def _test_sell_order_workflow(driver):
+def test_sell_order_workflow(driver):
     trading212 = Trading212()
 
-    unreasonable_amount = 10000
+    # TODO: Test for too small
+    # TODO: Test for precision more than 2 e.g 1.24353546 instead of 1.24
+    too_big_amount = 10000
     try:
-        trading212.place_order(OrderType.SELL, amount=unreasonable_amount)
+        trading212.place_order(OrderType.SELL, ticker=TICKER, amount=too_big_amount)
     except BrokerOrderError as e:
         expected_reason = FailureTypes.InsufficientValueForStocksSell
         assert expected_reason.lower() in e.args[0].lower()
 
+    position = trading212.get_position(TICKER)
+    sell_amount = 1.0
+    equity_exists = True
+    if sell_amount > position["quantity"] * position["currentPrice"]:
+        # Increasing trade amount before buying in cases where the price drops before sale.
+        buy_amount = sell_amount + 0.5
+        order = trading212.place_order(OrderType.BUY, ticker=TICKER, amount=buy_amount)
+        order_id = order["orderId"]
+        status = trading212.get_status(order_id)["status"]
+        assert status["status"] in [OrderStatus.SUBMITTED, OrderStatus.COMPLETED]
 
+        retries = 5
+        while status is OrderStatus.SUBMITTED and status is not OrderStatus.COMPLETED:
+            time.sleep(5)
+            status = trading212.get_status(order_id)["status"]
+            retries -= 1
+            if not retries:
+                break
 
+        if status is OrderStatus.SUBMITTED:
+            equity_exists = False
+            trading212.cancel_order(order_id)
 
+    # TODO: Log here so we know when remaining tests are run.
+    if not equity_exists:
+        return
 
+    order = trading212.place_order(OrderType.SELL, ticker=TICKER, amount=sell_amount)
+    assert order.get("cost", {}).get("orderQuantity", VALUE_UNAVAILABLE) < VALUE_UNAVAILABLE
 
+    order_id = order.get("orderId", "")
+    status = trading212.get_status(order_id)
+    assert status["status"] in [OrderStatus.SUBMITTED, OrderStatus.COMPLETED]
 
-    # Check if order was completed in previous tests.
-    # Check amount of stocks available in the equity
-    # Get equity data
-    # Get ask price
-    # Get sell costs
-    # Try selling more than exists
-    # Try selling what was bought if completed
-    # Check status
-    # Check status
+    if status["status"] == OrderStatus.SUBMITTED:
+        trading212.cancel_order(order_id)
+        assert trading212.get_status(order_id)["status"] == OrderStatus.CANCELLED

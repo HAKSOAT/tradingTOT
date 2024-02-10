@@ -5,6 +5,7 @@ class OrderStatus(str, Enum):
     SUBMITTED = "SUBMITTED"
     REJECTED = "REJECTED"
     COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
 
 
 class OrderType(str, Enum):
@@ -19,3 +20,4 @@ class Environment(str, Enum):
 
 class FailureTypes(str, Enum):
     InsufficientValueForStocksSell = "InsufficientValueForStocksSell"
+    ValuePrecisionMismatch = "ValuePrecisionMismatch"
