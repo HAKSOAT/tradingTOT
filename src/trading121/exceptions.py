@@ -12,3 +12,6 @@ class BrokerOrderError(Exception):
 
 class OrderOperationError(Exception):
     pass
+
+class LocalAuthException(Exception):
+    pass

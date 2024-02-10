@@ -17,7 +17,7 @@ def test_login_correct_details(driver, test_env):
 
     clear_browser(driver)
 
-    assert get_login_token(driver) is None
+    assert get_login_token(driver=driver) is None
     driver = login_trading212(driver, username, password)
 
     # Waiting till the browser's page changes as the change does not happen immediately and this may lead to the
@@ -27,4 +27,4 @@ def test_login_correct_details(driver, test_env):
         time.sleep(1)
         max_wait -= 1
 
-    assert get_login_token(driver) is not None
+    assert get_login_token(driver=driver) is not None

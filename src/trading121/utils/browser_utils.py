@@ -2,7 +2,7 @@ import os
 import re
 from pathlib import Path
 from functools import wraps
-from typing import Dict, Callable, Union
+from typing import Dict, Callable, Union, Optional
 
 import requests
 from requests.exceptions import ConnectionError
@@ -19,6 +19,7 @@ from tenacity import retry, stop_after_attempt
 from trading121.enums import Environment
 from trading121.exceptions import AuthError
 from trading121.endpoints import HOME_URL, AUTHENTICATE_URL
+from trading121.utils.cache import AuthData, LocalAuthStorage
 
 
 class Driver:
@@ -45,8 +46,7 @@ class Driver:
         # TODO: Extract binary location to env file
         options.binary_location = "/Applications/Chromium.app/Contents/MacOS/Chromium"
         options.add_argument(
-            'user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
-            'Chrome/102.0.5005.63 Safari/537.36'
+            f'user-agent={AuthData.UserAgent}'
         )
         scale = 2
         width = 1680
@@ -180,40 +180,56 @@ def get_duuid(driver: WebDriver) -> str:
             return cookie["value"].split(".")[0]
 
 
-def generate_headers(driver: WebDriver) -> Dict:
+def generate_headers(*, driver: Optional[WebDriver] = None, auth_data: Optional[AuthData] = None) -> Dict:
     """Get the headers needed for creating a Trading212 session.
 
     Args:
         driver: Selenium Webdriver
+        auth_data: AuthData
 
     Returns:
     """
-    duuid = get_duuid(driver)
-    if not duuid:
-        raise Exception("DDUID Not Found")
+    if all([driver, auth_data]) or not any([driver, auth_data]):
+        raise ValueError("Provide one of driver or auth_data.")
+
+    if driver:
+        duuid = get_duuid(driver)
+        if not duuid:
+            raise Exception("DDUID Not Found")
+        user_agent = driver.execute_script("return navigator.userAgent;")
+    else:
+        duuid = auth_data.DUUID
+        user_agent = auth_data.UserAgent
 
     headers = {
-        "User-Agent": driver.execute_script("return navigator.userAgent;"),
+        "User-Agent": user_agent,
         "X-Trader-Client": f"application=WC4, version=1.0.0, dUUID={duuid}",
         "Content-Type": "application/json"
     }
     return headers
 
 
-def get_login_token(driver: WebDriver) -> Union[str, None]:
+def get_login_token(*, driver: Optional[WebDriver] = None, auth_data: Optional[AuthData] = None) -> Union[str, None]:
     """
-    Extracts the login token from the browser cookies.
+    Extracts the login token from the browser cookies or auth data.
 
     Args:
         driver: Selenium Webdriver
+        auth_data: AuthData
 
     Returns:
         The login token (if found) or None.
     """
-    login_cookie = driver.get_cookie("LOGIN_TOKEN")
-    if login_cookie:
-        return login_cookie["value"]
-    return None
+    if all([driver, auth_data]) or not any([driver, auth_data]):
+        raise ValueError("Provide one of driver or auth_data.")
+
+    if driver:
+        login_cookie = driver.get_cookie("LOGIN_TOKEN")
+        if login_cookie:
+            return login_cookie["value"]
+        return None
+    else:
+        return auth_data.LoginToken
 
 
 def enforce_auth(func: Callable):
@@ -242,18 +258,35 @@ def enforce_auth(func: Callable):
         retries = 3
         while not is_auth and retries:
             retries -= 1
-            driver = Driver.load()
-            driver = login_trading212(driver, os.environ.get("TRADING212_EMAIL"),
-                                      os.environ.get("TRADING212_PASSWORD"))
+            # TODO: Make it possible to turn off LocalAuthStorage
+            local_auth_storage = LocalAuthStorage()
+            auth_data = local_auth_storage.read()
+            if auth_data is None:
+                driver = Driver.load()
+                driver = login_trading212(driver, os.environ.get("TRADING212_EMAIL"),
+                                          os.environ.get("TRADING212_PASSWORD"))
+            else:
+                driver = None
 
-            headers = generate_headers(driver)
-            auth_cookies = {'LOGIN_TOKEN': get_login_token(driver)}
+            headers = generate_headers(driver=driver, auth_data=auth_data)
+            auth_cookies = {'LOGIN_TOKEN': get_login_token(driver=driver, auth_data=auth_data)}
             session = requests.Session()
             session.headers.update(headers)
             session.cookies.update(auth_cookies)
+
             instance.session = session
             auth_response = instance.session.get(AUTHENTICATE_URL)
             is_auth = True if auth_response.status_code == 200 else False
+
+            if is_auth and auth_data is None:
+                auth_data = AuthData(
+                    DUUID=get_duuid(driver),
+                    UserAgent=headers["User-Agent"],
+                    LoginToken=auth_cookies["LOGIN_TOKEN"]
+                )
+                local_auth_storage.write(auth_data)
+            elif not is_auth and auth_data is not None:
+                local_auth_storage.delete()
 
         if not is_auth and not retries:
             raise AuthError("Failed to log in using Selenium.")
