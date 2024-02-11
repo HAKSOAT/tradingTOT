@@ -2,7 +2,7 @@ from typing import Optional, Union
 from typing import List, Dict
 from pydantic import BaseModel
 
-from trading121.constants import VALUE_UNAVAILABLE
+from tradingTOT.constants import VALUE_UNAVAILABLE
 
 
 class Position(BaseModel):

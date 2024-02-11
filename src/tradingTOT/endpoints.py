@@ -5,7 +5,7 @@ from .exceptions import EnvVarError
 
 
 try:
-    environment = os.environ.get("TRADING212_ENVIRONMENT", "")
+    environment = os.environ.get("TRADINGTOT_ENVIRONMENT", "")
     environment = getattr(Environment, environment)
 except AttributeError:
     raise EnvVarError(f"Set a valid environment variable for `TRADING212_ENVIRONMENT`. "

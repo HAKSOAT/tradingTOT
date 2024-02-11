@@ -16,10 +16,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium_stealth import stealth
 from tenacity import retry, stop_after_attempt
 
-from trading121.enums import Environment
-from trading121.exceptions import AuthError
-from trading121.endpoints import HOME_URL, AUTHENTICATE_URL
-from trading121.utils.cache import AuthData, LocalAuthStorage
+from tradingTOT.enums import Environment
+from tradingTOT.exceptions import AuthError
+from tradingTOT.endpoints import HOME_URL, AUTHENTICATE_URL
+from tradingTOT.utils.cache import AuthData, LocalAuthStorage
 
 
 class Driver:
@@ -94,7 +94,7 @@ def accept_cookies(driver: WebDriver) -> None:
 
 # Retrying because Trading212 sometimes comes up with a "something went wrong" error.
 @retry(stop=stop_after_attempt(3))
-def login_trading212(driver: WebDriver, email: str, password: str) -> WebDriver:
+def login_tradingTOT(driver: WebDriver, email: str, password: str) -> WebDriver:
     """
     Login to a Trading212 account.
 
@@ -263,8 +263,8 @@ def enforce_auth(func: Callable):
             auth_data = local_auth_storage.read()
             if auth_data is None:
                 driver = Driver.load()
-                driver = login_trading212(driver, os.environ.get("TRADING212_EMAIL"),
-                                          os.environ.get("TRADING212_PASSWORD"))
+                driver = login_tradingTOT(driver, os.environ.get("TRADINGTOT_EMAIL"),
+                                          os.environ.get("TRADINGTOT_PASSWORD"))
             else:
                 driver = None
 

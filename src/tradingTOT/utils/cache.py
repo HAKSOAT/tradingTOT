@@ -3,7 +3,7 @@ from typing import Dict, Optional
 from pathlib import Path
 from dataclasses import dataclass
 
-from trading121.constants import DEFAULT_AUTH_DIRECTORY
+from tradingTOT.constants import DEFAULT_AUTH_DIRECTORY
 
 
 @dataclass

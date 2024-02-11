@@ -3,15 +3,15 @@ from typing import Union, Dict, Optional, Set, List
 
 from requests.sessions import Session
 
-from trading121.schemas.api_responses import Position, SummarySchema
-from trading121.exceptions import BrokerOrderError
-from trading121.endpoints import (VALIDATE_URL, PLACE_ORDER_URL,
-                        ORDER_COSTS_URL, TICKER_PRICE_URL, ACCOUNT_SUMMARY_URL,
-                        ORDER_HISTORY, ALGOLIA_CONFIG_URL, ALGOLIA_SEARCH_URL)
-from trading121.enums import OrderStatus, OrderType
+from tradingTOT.schemas.api_responses import Position, SummarySchema
+from tradingTOT.exceptions import BrokerOrderError
+from tradingTOT.endpoints import (VALIDATE_URL, PLACE_ORDER_URL,
+                                  ORDER_COSTS_URL, TICKER_PRICE_URL, ACCOUNT_SUMMARY_URL,
+                                  ORDER_HISTORY, ALGOLIA_CONFIG_URL, ALGOLIA_SEARCH_URL)
+from tradingTOT.enums import OrderStatus, OrderType
 
-from trading121.existing_orders import ExistingOrdersHandler
-from trading121.utils.browser_utils import enforce_auth
+from tradingTOT.existing_orders import ExistingOrdersHandler
+from tradingTOT.utils.browser_utils import enforce_auth
 
 
 # The value is randomly chosen as I am yet to observe an increment more than that.
@@ -20,7 +20,7 @@ FILLID_MAX_INCREMENT = 50
 SUPPORTED_EXCHANGES = {"NASDAQ", "NYSE"}
 
 
-class Trading212:
+class tradingTOT:
     def __init__(self, session: Optional[Session] = None):
         """
         Main class for executing Trading212 functionality.

@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "trading121"
+name = "tradingTOT"
 version = "0.1.0"
 description = "A selenium-based Python package for interacting with the Trading212 stock trading platform."
 authors = ["Habeeb Shopeju <shopejuh@gmail.com>"]
@@ -16,7 +16,7 @@ pydantic = "^2.5.2"
 urllib3 = "1.26.18"
 pytest-order = "^1.2.0"
 tenacity = "^8.2.3"
-
+python-dotenv = "^1.0.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.3"

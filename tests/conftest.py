@@ -5,7 +5,7 @@ from selenium.common.exceptions import WebDriverException
 
 from dotenv import load_dotenv
 
-from trading121.utils import browser_utils
+from tradingTOT.utils import browser_utils
 
 
 @fixture(scope="function")

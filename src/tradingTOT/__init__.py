@@ -1,4 +1,4 @@
-"""The Trading212 Broker package."""
+"""The unofficial Trading212 Broker package."""
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -8,4 +8,4 @@ env_name = Path("local.env")
 
 load_dotenv(repo_folder / env_name)
 
-from .trading212 import Trading212
+from .tradingTOT import tradingTOT
