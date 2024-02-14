@@ -5,7 +5,7 @@ from selenium.common.exceptions import WebDriverException
 
 from dotenv import load_dotenv
 
-from tradingTOT.utils import browser_utils
+from tradingTOT.utils import browser
 
 
 @fixture(scope="function")
@@ -17,8 +17,8 @@ def test_env():
 
 @fixture(scope="session")
 def driver():
-    driver = browser_utils.Driver.load()
-    with patch.object(browser_utils.Driver, "load") as mock_driver:
+    driver = browser.Driver.load()
+    with patch.object(browser.Driver, "load") as mock_driver:
         mock_driver.return_value = driver
         yield driver
         driver.quit()

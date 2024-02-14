@@ -8,7 +8,7 @@ try:
     environment = os.environ.get("TRADINGTOT_ENVIRONMENT", "")
     environment = getattr(Environment, environment)
 except AttributeError:
-    raise EnvVarError(f"Set a valid environment variable for `TRADING212_ENVIRONMENT`. "
+    raise EnvVarError(f"Set a valid environment variable for `TRADINGTOT_ENVIRONMENT`. "
                       f"Supported values are {', '.join(Environment.__members__)}.")
 
 

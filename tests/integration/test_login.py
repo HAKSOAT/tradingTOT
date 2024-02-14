@@ -3,7 +3,7 @@ import time
 
 import pytest
 
-from tradingTOT.utils.browser_utils import login_tradingTOT, get_login_token
+from tradingTOT.utils.browser import login_tradingTOT, get_login_token
 from tests.conftest import clear_browser
 
 

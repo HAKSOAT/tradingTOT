@@ -1,9 +1,15 @@
+from abc import ABC, abstractmethod
+from enum import Enum
+
 import json
-from typing import Dict, Optional
+from os.path import expanduser
+from typing import Optional
 from pathlib import Path
 from dataclasses import dataclass
 
-from tradingTOT.constants import DEFAULT_AUTH_DIRECTORY
+
+DEFAULT_AUTH_DIRECTORY = Path(expanduser("~/.TOT/auth"))
+DEFAULT_SCREENSHOTS_DIRECTORY = Path(expanduser("~/.TOT/shots"))
 
 
 @dataclass
@@ -14,7 +20,23 @@ class AuthData:
                                 "Chrome/102.0.5005.63 Safari/537.36")
 
 
-class LocalAuthStorage:
+class ShotPath(str, Enum):
+    accept_cookies = DEFAULT_SCREENSHOTS_DIRECTORY / "accept_cookies.png",
+    after_login = DEFAULT_SCREENSHOTS_DIRECTORY / "after_login.png",
+    before_login = DEFAULT_SCREENSHOTS_DIRECTORY / "before_login.png"
+
+
+class Storage(ABC):
+    @abstractmethod
+    def read(self):
+        pass
+
+    @abstractmethod
+    def write(self, data):
+        pass
+
+
+class LocalAuthStorage(Storage):
     def __init__(self, auth_dir: Path = DEFAULT_AUTH_DIRECTORY) -> None:
         self.dir = auth_dir
         self.dir.mkdir(parents=True, exist_ok=True)

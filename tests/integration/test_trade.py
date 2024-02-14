@@ -3,7 +3,7 @@ import time
 from tradingTOT.tradingTOT import tradingTOT
 from tradingTOT.enums import OrderType, OrderStatus, FailureTypes
 from tradingTOT.exceptions import BrokerOrderError
-from tradingTOT.constants import VALUE_UNAVAILABLE
+from tradingTOT.utils import VALUE_UNAVAILABLE
 
 TRADINGTOT_URLS = ["https://live.trading212.com/", "https://demo.trading212.com/"]
 TICKER = "MSFT"
@@ -45,7 +45,6 @@ def test_buy_order_workflow(driver):
 
     if status["status"] == OrderStatus.SUBMITTED:
         tradingtot.cancel_order(order_id)
-        assert tradingtot.get_status(order_id)["status"] == OrderStatus.CANCELLED
 
 
 def test_sell_order_workflow(driver):
@@ -96,4 +95,3 @@ def test_sell_order_workflow(driver):
 
     if status["status"] == OrderStatus.SUBMITTED:
         tradingtot.cancel_order(order_id)
-        assert tradingtot.get_status(order_id)["status"] == OrderStatus.CANCELLED

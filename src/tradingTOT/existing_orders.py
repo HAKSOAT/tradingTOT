@@ -3,8 +3,9 @@ from typing import Union, Dict, List
 import requests
 from requests.models import Response
 
-from .endpoints import AUTHENTICATE_URL, ACCOUNT_SUMMARY_URL
-from .schemas.api_responses import SummarySchema, AfterOrderSchema
+from tradingTOT.endpoints import AUTHENTICATE_URL, ACCOUNT_SUMMARY_URL
+from tradingTOT.schemas.api_responses import SummarySchema, AfterOrderSchema
+from tradingTOT.utils.browser import enforce_auth
 
 
 class ExistingOrdersHandler:
@@ -21,7 +22,7 @@ class ExistingOrdersHandler:
         Returns:
         """
         if not response:
-            self.session.get(AUTHENTICATE_URL)
+            enforce_auth(lambda x: x)(self)
             response = self.session.post(ACCOUNT_SUMMARY_URL, json=[]).json()
 
         if isinstance(response, requests.models.Response):

@@ -11,7 +11,7 @@ from tradingTOT.endpoints import (VALIDATE_URL, PLACE_ORDER_URL,
 from tradingTOT.enums import OrderStatus, OrderType
 
 from tradingTOT.existing_orders import ExistingOrdersHandler
-from tradingTOT.utils.browser_utils import enforce_auth
+from tradingTOT.utils.browser import enforce_auth
 
 
 # The value is randomly chosen as I am yet to observe an increment more than that.
@@ -37,6 +37,7 @@ class tradingTOT:
         self.ticker_to_object_id = {}
         self.object_id_to_ticker = {}
 
+    # TODO: Add a force relogin functionality that does not rely on cache.
     @enforce_auth
     def place_order(self, action: Union[OrderType, str], ticker: str, amount: Union[float, int]) -> Dict:
         """

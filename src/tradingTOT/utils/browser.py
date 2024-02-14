@@ -1,5 +1,7 @@
 import os
+import platform
 import re
+import subprocess
 from pathlib import Path
 from functools import wraps
 from typing import Dict, Callable, Union, Optional
@@ -19,7 +21,7 @@ from tenacity import retry, stop_after_attempt
 from tradingTOT.enums import Environment
 from tradingTOT.exceptions import AuthError
 from tradingTOT.endpoints import HOME_URL, AUTHENTICATE_URL
-from tradingTOT.utils.cache import AuthData, LocalAuthStorage
+from tradingTOT.utils.storage import AuthData, LocalAuthStorage, ShotPath
 
 
 class Driver:
@@ -44,7 +46,7 @@ class Driver:
 
         # export CHROME_VERSION="114.0.5735.90" && wget --no-verbose -O /tmp/chrome.deb https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_${CHROME_VERSION}-1_amd64.deb && apt install -y /tmp/chrome.deb && rm /tmp/chrome.deb
         # TODO: Extract binary location to env file
-        options.binary_location = "/Applications/Chromium.app/Contents/MacOS/Chromium"
+        options.binary_location = os.environ["CHROME_BINARY_PATH"]
         options.add_argument(
             f'user-agent={AuthData.UserAgent}'
         )
@@ -78,7 +80,7 @@ def accept_cookies(driver: WebDriver) -> None:
     Returns:
     """
     try:
-        driver.save_screenshot("accept-cookies.png")
+        driver.save_screenshot(ShotPath.accept_cookies.value)
         accept_button = driver.find_element(By.XPATH, "//p[text()='Accept all cookies']")
         accept_button.click()
     except NoSuchElementException:
@@ -111,6 +113,7 @@ def login_tradingTOT(driver: WebDriver, email: str, password: str) -> WebDriver:
         retries -= 1
         try:
             driver.get(HOME_URL)
+            driver.save_screenshot("login_page.png")
             break
         except WebDriverException as err:
             # Sometimes the browser becomes inaccessible, especially after long periods of non-use.
@@ -120,13 +123,14 @@ def login_tradingTOT(driver: WebDriver, email: str, password: str) -> WebDriver:
                 raise AuthError("Failed to load home page.") from err
 
     # TODO: Switch this to a screenshot logging functionality
-    before_login_shot = Path("before_login_shot.png")
-    driver.save_screenshot(before_login_shot)
+    driver.save_screenshot(ShotPath.before_login.value)
 
     env_pattern = "|".join([e for e in Environment])
     if re.search(env_pattern, driver.current_url):
         print("Already logged in.")
         return driver
+
+    driver.save_screenshot("login_page_2.png")
 
     accept_cookies(driver)
 
@@ -158,8 +162,7 @@ def login_tradingTOT(driver: WebDriver, email: str, password: str) -> WebDriver:
     except TimeoutException as err:
         raise AuthError(f"Trading dashboard failed to load in {max_wait_time} seconds.") from err
     finally:
-        after_login_shot = Path("after_login_shot.png")
-        driver.save_screenshot(after_login_shot)
+        driver.save_screenshot(ShotPath.after_login.value)
 
     return driver
 
@@ -259,6 +262,7 @@ def enforce_auth(func: Callable):
         while not is_auth and retries:
             retries -= 1
             # TODO: Make it possible to turn off LocalAuthStorage
+            # TODO: Log when localstorage is being used and when browser is being used.
             local_auth_storage = LocalAuthStorage()
             auth_data = local_auth_storage.read()
             if auth_data is None:
@@ -301,3 +305,46 @@ def enforce_auth(func: Callable):
         return func(*args, **kwargs)
 
     return wrapper
+
+
+def find_chrome_path():
+    os_name = platform.system()
+
+    if os_name == 'Darwin':  # macOS
+        default_path = '/Applications/Google Chrome.app'
+        if os.path.exists(default_path):
+            return default_path
+        else:
+            try:
+                # Attempt to find Chrome using the macOS 'mdfind' command
+                result = subprocess.check_output(['mdfind', 'kMDItemCFBundleIdentifier == "com.google.Chrome"']).decode().strip()
+                return result.split('\n')[0] if result else None
+            except Exception as e:
+                print(f"Error finding Chrome on macOS: {e}")
+                return None
+
+    elif os_name == 'Linux':
+        # Try common Linux locations
+        paths = [
+            '/usr/bin/google-chrome',
+            '/usr/bin/chromium',
+            '/usr/bin/chromium-browser',
+            # Add more paths if necessary
+        ]
+        for path in paths:
+            if os.path.isfile(path):
+                return path
+        return None
+
+    elif os_name == 'Windows':
+        try:
+            # Attempt to find Chrome using where command in Windows
+            result = subprocess.check_output(['where', 'chrome'], shell=True).decode().strip()
+            return result.split('\r\n')[0] if result else None
+        except Exception as e:
+            print(f"Error finding Chrome on Windows: {e}")
+            return None
+
+    else:
+        print("Unsupported OS")
+        return None
