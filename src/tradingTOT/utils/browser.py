@@ -22,6 +22,7 @@ from tradingTOT.enums import Environment
 from tradingTOT.exceptions import AuthError
 from tradingTOT.endpoints import HOME_URL, AUTHENTICATE_URL
 from tradingTOT.utils.storage import AuthData, LocalAuthStorage, ShotPath
+from tradingTOT.utils.pathfinder import find_path
 
 
 class Driver:
@@ -42,11 +43,14 @@ class Driver:
         if cls.driver:
             return cls.driver
 
+        # Interestingly ChromeOptions seems to works with all the browsers when observed.
         options = webdriver.ChromeOptions()
 
         # export CHROME_VERSION="114.0.5735.90" && wget --no-verbose -O /tmp/chrome.deb https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_${CHROME_VERSION}-1_amd64.deb && apt install -y /tmp/chrome.deb && rm /tmp/chrome.deb
         # TODO: Extract binary location to env file
-        options.binary_location = os.environ["CHROME_BINARY_PATH"]
+        p = str(find_path().resolve())
+        print(p)
+        options.binary_location = os.environ.get("BINARY_PATH", p)
         options.add_argument(
             f'user-agent={AuthData.UserAgent}'
         )
@@ -56,10 +60,11 @@ class Driver:
         options.add_argument(f"--window-size={width * scale},{height * scale}")
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument("--disable-extensions")
-        options.add_argument("--headless")
+        # options.add_argument("--headless")
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         options.add_experimental_option('useAutomationExtension', False)
 
+        # The Chrome webdriver object here also works with all the browsers when observed.
         driver = webdriver.Chrome(options=options)
         stealth(
             driver, languages=["en-US", "en"], vendor="Google Inc.",
@@ -305,46 +310,3 @@ def enforce_auth(func: Callable):
         return func(*args, **kwargs)
 
     return wrapper
-
-
-def find_chrome_path():
-    os_name = platform.system()
-
-    if os_name == 'Darwin':  # macOS
-        default_path = '/Applications/Google Chrome.app'
-        if os.path.exists(default_path):
-            return default_path
-        else:
-            try:
-                # Attempt to find Chrome using the macOS 'mdfind' command
-                result = subprocess.check_output(['mdfind', 'kMDItemCFBundleIdentifier == "com.google.Chrome"']).decode().strip()
-                return result.split('\n')[0] if result else None
-            except Exception as e:
-                print(f"Error finding Chrome on macOS: {e}")
-                return None
-
-    elif os_name == 'Linux':
-        # Try common Linux locations
-        paths = [
-            '/usr/bin/google-chrome',
-            '/usr/bin/chromium',
-            '/usr/bin/chromium-browser',
-            # Add more paths if necessary
-        ]
-        for path in paths:
-            if os.path.isfile(path):
-                return path
-        return None
-
-    elif os_name == 'Windows':
-        try:
-            # Attempt to find Chrome using where command in Windows
-            result = subprocess.check_output(['where', 'chrome'], shell=True).decode().strip()
-            return result.split('\r\n')[0] if result else None
-        except Exception as e:
-            print(f"Error finding Chrome on Windows: {e}")
-            return None
-
-    else:
-        print("Unsupported OS")
-        return None
