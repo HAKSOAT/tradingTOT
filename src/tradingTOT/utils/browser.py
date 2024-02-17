@@ -289,7 +289,6 @@ def enforce_auth(func: Callable):
         except ConnectionError:
             is_auth = False
 
-        # TODO: Store headers in a local cache and load from there initially.
         retries = 3
         while not is_auth and retries:
             retries -= 1

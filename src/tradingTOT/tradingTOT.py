@@ -257,7 +257,7 @@ class tradingTOT:
             if description["key"] == "history.details.order.fill.date-executed.key" and details["context"]:
                 is_executed = True
 
-            # TODO: Handle the case if the account is in USD
+            # TODO: Handle the case if the account is in another currency apart from USD
             if description["key"] == "history.details.order.exchange-rate.key" and details["context"]:
                 exchange_rate = details["context"]["quantity"]
 

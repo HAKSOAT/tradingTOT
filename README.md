@@ -1,7 +1,3 @@
-Based on the files you've provided, which include main logic and test cases for a trading application, I'll draft a README structure for your project. This README will provide an introduction, setup instructions, usage guidance, information on running tests, contributing guidelines, and a disclaimer.
-
----
-
 # TradingTOT
 
 ## Introduction
@@ -95,7 +91,3 @@ You do not have to worry about the webdriver as Selenium 4 handles driver downlo
 
 ## Disclaimer
 This project is not officially affiliated with Trading212 or any other trading platform. It is developed as an independent tool to assist users in automating their trading strategies. Use at your own risk and discretion.
-
----
-
-This template provides a basic structure for your README. You may need to adjust the paths, environment variables, and example usage according to your project's specific setup and functionalities.
