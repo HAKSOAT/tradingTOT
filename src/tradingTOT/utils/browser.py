@@ -1,7 +1,11 @@
+from __future__ import annotations
+
+import logging
 import os
 import platform
 import re
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 from functools import wraps
 from typing import Dict, Callable, Union, Optional
@@ -10,9 +14,12 @@ import requests
 from requests.exceptions import ConnectionError
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
+from selenium.webdriver.remote.remote_connection import LOGGER as SeleniumLogger
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.webdriver import WebDriver
+from selenium.webdriver.remote.webdriver import WebDriver as RemoteWebDriver
 from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.common.options import ArgOptions
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium_stealth import stealth
@@ -22,7 +29,26 @@ from tradingTOT.enums import Environment
 from tradingTOT.exceptions import AuthError
 from tradingTOT.endpoints import HOME_URL, AUTHENTICATE_URL
 from tradingTOT.utils.storage import AuthData, LocalAuthStorage, ShotPath
-from tradingTOT.utils.pathfinder import find_path
+from tradingTOT.utils.pathfinder import find_path, Browser
+
+
+# TODO: Silence the INFO logs that show when using Edge browser.
+
+@dataclass
+class DriverClassPack:
+    driver: RemoteWebDriver = webdriver.Chrome
+    options: ArgOptions = webdriver.ChromeOptions
+
+    @staticmethod
+    def get(browser_path: Path) -> DriverClassPack:
+        if Browser.edge.lower() in str(browser_path):
+            return DriverClassPack(driver=webdriver.Edge, options=webdriver.EdgeOptions)
+        elif Browser.safari.lower() in str(browser_path):
+            return DriverClassPack(driver=webdriver.Safari, options=webdriver.SafariOptions)
+        elif Browser.firefox.lower() in str(browser_path):
+            return DriverClassPack(driver=webdriver.Firefox, options=webdriver.FirefoxOptions)
+        else:
+            return DriverClassPack()
 
 
 class Driver:
@@ -43,14 +69,22 @@ class Driver:
         if cls.driver:
             return cls.driver
 
-        # Interestingly ChromeOptions seems to works with all the browsers when observed.
-        options = webdriver.ChromeOptions()
-
         # export CHROME_VERSION="114.0.5735.90" && wget --no-verbose -O /tmp/chrome.deb https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_${CHROME_VERSION}-1_amd64.deb && apt install -y /tmp/chrome.deb && rm /tmp/chrome.deb
-        # TODO: Extract binary location to env file
-        p = str(find_path().resolve())
-        print(p)
-        options.binary_location = os.environ.get("BINARY_PATH", p)
+        binary_location = os.environ.get("BINARY_PATH")
+        if not binary_location:
+            path = find_path()
+            print(path)
+            if not path:
+                raise FileNotFoundError("No browser binary was found. "
+                                        "Ensure that one of Chrome, Firefox, MS Edge or Safari is installed. "
+                                        "If you are certain they are installed, set the `BINARY_PATH` environment variable. "
+                                        "Check the docs for more information.")
+
+            binary_location = str(path.resolve())
+
+        class_pack = DriverClassPack.get(binary_location)
+        options = class_pack.options()
+        options.binary_location = binary_location
         options.add_argument(
             f'user-agent={AuthData.UserAgent}'
         )
@@ -60,17 +94,20 @@ class Driver:
         options.add_argument(f"--window-size={width * scale},{height * scale}")
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument("--disable-extensions")
-        # options.add_argument("--headless")
-        options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        options.add_experimental_option('useAutomationExtension', False)
+        options.add_argument("--headless")
 
-        # The Chrome webdriver object here also works with all the browsers when observed.
-        driver = webdriver.Chrome(options=options)
-        stealth(
-            driver, languages=["en-US", "en"], vendor="Google Inc.",
-            platform="Win32", webgl_vendor="Intel Inc.", renderer="Intel Iris OpenGL Engine",
-            fix_hairline=True,
-        )
+        if hasattr(options, "add_experimental_option"):
+            options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            options.add_experimental_option('useAutomationExtension', False)
+
+        driver = class_pack.driver(options=options)
+        # Stealth only works for Chrome.
+        if class_pack.driver == webdriver.Chrome:
+            stealth(
+                driver, languages=["en-US", "en"], vendor="Google Inc.",
+                platform="Win32", webgl_vendor="Intel Inc.", renderer="Intel Iris OpenGL Engine",
+                fix_hairline=True,
+            )
 
         cls.driver = driver
         return driver
@@ -118,7 +155,6 @@ def login_tradingTOT(driver: WebDriver, email: str, password: str) -> WebDriver:
         retries -= 1
         try:
             driver.get(HOME_URL)
-            driver.save_screenshot("login_page.png")
             break
         except WebDriverException as err:
             # Sometimes the browser becomes inaccessible, especially after long periods of non-use.
@@ -134,8 +170,6 @@ def login_tradingTOT(driver: WebDriver, email: str, password: str) -> WebDriver:
     if re.search(env_pattern, driver.current_url):
         print("Already logged in.")
         return driver
-
-    driver.save_screenshot("login_page_2.png")
 
     accept_cookies(driver)
 
@@ -203,7 +237,7 @@ def generate_headers(*, driver: Optional[WebDriver] = None, auth_data: Optional[
     if driver:
         duuid = get_duuid(driver)
         if not duuid:
-            raise Exception("DDUID Not Found")
+            raise AuthError("DDUID Not Found")
         user_agent = driver.execute_script("return navigator.userAgent;")
     else:
         duuid = auth_data.DUUID
@@ -252,7 +286,7 @@ def enforce_auth(func: Callable):
     @wraps(func)
     def wrapper(*args, **kwargs):
         if not args and not kwargs:
-            raise Exception("The wrapped function needs at least one argument.")
+            raise ValueError("The wrapped function needs at least one argument.")
 
         instance = kwargs.get("self", args[0])
 
@@ -277,8 +311,15 @@ def enforce_auth(func: Callable):
             else:
                 driver = None
 
-            headers = generate_headers(driver=driver, auth_data=auth_data)
-            auth_cookies = {'LOGIN_TOKEN': get_login_token(driver=driver, auth_data=auth_data)}
+            try:
+                headers = generate_headers(driver=driver, auth_data=auth_data)
+                auth_cookies = {'LOGIN_TOKEN': get_login_token(driver=driver, auth_data=auth_data)}
+            except AuthError as err:
+                if retries:
+                    continue
+                else:
+                    raise err
+
             session = requests.Session()
             session.headers.update(headers)
             session.cookies.update(auth_cookies)
