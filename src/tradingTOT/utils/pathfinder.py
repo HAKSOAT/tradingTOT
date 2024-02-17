@@ -107,7 +107,6 @@ class LinuxPathfinder(Pathfinder):
 
         return paths
 
-
     def _find_with_path(self, browser: Browser) -> Optional[Path]:
         paths = self._get_paths(browser)
         for path in paths:
@@ -121,8 +120,7 @@ class LinuxPathfinder(Pathfinder):
             command = ['which', path.name.lower()]
             result = subprocess.check_output(command).decode().strip()
             if result:
-                return result
-
+                return Path(result)
 
     def find(self, browser: Browser) -> Optional[Path]:
         path = None

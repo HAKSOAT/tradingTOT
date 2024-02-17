@@ -1,20 +1,16 @@
 from __future__ import annotations
 
-import logging
 import os
-import platform
 import re
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from functools import wraps
-from typing import Dict, Callable, Union, Optional
+from typing import Dict, Callable, Union, Optional, Type
 
 import requests
 from requests.exceptions import ConnectionError
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
-from selenium.webdriver.remote.remote_connection import LOGGER as SeleniumLogger
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.remote.webdriver import WebDriver as RemoteWebDriver
@@ -36,17 +32,15 @@ from tradingTOT.utils.pathfinder import find_path, Browser
 
 @dataclass
 class DriverClassPack:
-    driver: RemoteWebDriver = webdriver.Chrome
-    options: ArgOptions = webdriver.ChromeOptions
+    driver: Type[RemoteWebDriver] = webdriver.Chrome
+    options: Type[ArgOptions] = webdriver.ChromeOptions
 
     @staticmethod
-    def get(browser_path: Path) -> DriverClassPack:
+    def get(browser_path: Union[Path, str]) -> DriverClassPack:
         if Browser.edge.lower() in str(browser_path):
             return DriverClassPack(driver=webdriver.Edge, options=webdriver.EdgeOptions)
         elif Browser.safari.lower() in str(browser_path):
             return DriverClassPack(driver=webdriver.Safari, options=webdriver.SafariOptions)
-        elif Browser.firefox.lower() in str(browser_path):
-            return DriverClassPack(driver=webdriver.Firefox, options=webdriver.FirefoxOptions)
         else:
             return DriverClassPack()
 
@@ -73,7 +67,6 @@ class Driver:
         binary_location = os.environ.get("BINARY_PATH")
         if not binary_location:
             path = find_path()
-            print(path)
             if not path:
                 raise FileNotFoundError("No browser binary was found. "
                                         "Ensure that one of Chrome, Firefox, MS Edge or Safari is installed. "
