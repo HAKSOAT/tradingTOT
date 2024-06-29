@@ -5,6 +5,7 @@ description = "A selenium-based Python package for interacting with the Trading2
 authors = ["Habeeb Shopeju <shopejuh@gmail.com>"]
 license = "MIT"
 readme = "README.md"
+packages = [{include = "src/tradingTOT"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -29,3 +30,4 @@ build-backend = "poetry.core.masonry.api"
 [tool.poe.tasks]
 test.shell = "pytest tests"
 test.env = {PYTHONPATH = "."}
+
