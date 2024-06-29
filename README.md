@@ -29,6 +29,11 @@ You need to set the following environment variables:
 
 TRADINGTOT_ENVIRONMENT can be `live` or `demo`.
 
+#### Using a .env File
+
+You can also set the environment variables above in a `local.env` file. 
+This file should be located in the same directory as the `tradingTOT` directory i.e. the one containing the `pyproject.toml` file, NOT the one that is `src/tradingTOT`.
+
 ### Example Usage
 
 ```python

@@ -8,4 +8,4 @@ env_name = Path("local.env")
 
 load_dotenv(repo_folder / env_name)
 
-from .tradingTOT import tradingTOT
+from tradingTOT.tradingTOT import tradingTOT
