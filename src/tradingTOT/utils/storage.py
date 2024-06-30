@@ -21,9 +21,9 @@ class AuthData:
 
 
 class ShotPath(str, Enum):
-    accept_cookies = DEFAULT_SCREENSHOTS_DIRECTORY / "accept_cookies.png",
-    after_login = DEFAULT_SCREENSHOTS_DIRECTORY / "after_login.png",
-    before_login = DEFAULT_SCREENSHOTS_DIRECTORY / "before_login.png"
+    ACCEPT_COOKIES = "accept_cookies.png",
+    AFTER_LOGIN = "after_login.png",
+    BEFORE_LOGIN = "before_login.png"
 
 
 class Storage(ABC):
@@ -34,6 +34,26 @@ class Storage(ABC):
     @abstractmethod
     def write(self, data):
         pass
+
+
+class LocalShotStorage(Storage):
+    def __init__(self, index, shots_dir: Path = DEFAULT_SCREENSHOTS_DIRECTORY) -> None:
+        self.dir = shots_dir / index
+        self.dir.mkdir(parents=True, exist_ok=True)
+
+    def read(self):
+        raise NotImplementedError("Reading of images not supported.")
+
+    def write(self, driver, type_: ShotPath):
+        if not isinstance(type_, ShotPath):
+            raise ValueError(f"The type: {type_} is not supported.")
+        driver.save_screenshot(Path(self.dir, type_.value))
+
+    def delete(self):
+        for enum, shot_path in ShotPath.__members__.items():
+            path = Path(self.dir, shot_path.value)
+            if path.exists():
+                path.unlink()
 
 
 class LocalAuthStorage(Storage):

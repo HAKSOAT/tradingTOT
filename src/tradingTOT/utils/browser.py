@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
+from datetime import datetime
 from dataclasses import dataclass
 from pathlib import Path
 from functools import wraps
@@ -24,11 +26,13 @@ from tenacity import retry, stop_after_attempt
 from tradingTOT.enums import Environment
 from tradingTOT.exceptions import AuthError
 from tradingTOT.endpoints import HOME_URL, AUTHENTICATE_URL
-from tradingTOT.utils.storage import AuthData, LocalAuthStorage, ShotPath
+from tradingTOT.utils.storage import AuthData, LocalAuthStorage, ShotPath, LocalShotStorage
 from tradingTOT.utils.pathfinder import find_path, Browser
 
 
 # TODO: Silence the INFO logs that show when using Edge browser.
+logger: Final = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 @dataclass
 class DriverClassPack:
@@ -115,7 +119,6 @@ def accept_cookies(driver: WebDriver) -> None:
     Returns:
     """
     try:
-        driver.save_screenshot(ShotPath.accept_cookies.value)
         accept_button = driver.find_element(By.XPATH, "//p[text()='Accept all cookies']")
         accept_button.click()
     except NoSuchElementException:
@@ -129,8 +132,13 @@ def accept_cookies(driver: WebDriver) -> None:
             raise AuthError("Unable to accept cookies")
 
 
+def log_attempt_number(retry_state):
+    """return the result of the last call attempt"""
+    logger.warn(f"Retrying login attempt: {retry_state.attempt_number}...")
+
+
 # Retrying because Trading212 sometimes comes up with a "something went wrong" error.
-@retry(stop=stop_after_attempt(3))
+@retry(stop=stop_after_attempt(3), after=log_attempt_number)
 def login_tradingTOT(driver: WebDriver, email: str, password: str) -> WebDriver:
     """
     Login to a Trading212 account.
@@ -143,6 +151,8 @@ def login_tradingTOT(driver: WebDriver, email: str, password: str) -> WebDriver:
     Returns:
         Selenium Webdriver
     """
+    shot_storage = LocalShotStorage(datetime.now().strftime("%m-%d-%Y_%H-%M-%S"))
+
     retries = 3
     while retries:
         retries -= 1
@@ -156,45 +166,56 @@ def login_tradingTOT(driver: WebDriver, email: str, password: str) -> WebDriver:
             else:
                 raise AuthError("Failed to load home page.") from err
 
-    # TODO: Switch this to a screenshot logging functionality
-    driver.save_screenshot(ShotPath.before_login.value)
-
     env_pattern = "|".join([e for e in Environment])
     if re.search(env_pattern, driver.current_url):
         print("Already logged in.")
         return driver
 
+    shot_storage.write(driver, ShotPath.ACCEPT_COOKIES)
     accept_cookies(driver)
 
     actions = ActionChains(driver)
-
     login_link = driver.find_element(By.XPATH, "//p[starts-with(@class, 'Header_login-button')]")
     actions.move_to_element(login_link).click(login_link).perform()
 
     actions = ActionChains(driver)
-    email_input = driver.find_element(By.XPATH, "//input[@name='email' and @type='email']")
-    actions.move_to_element(email_input).click(email_input).send_keys(email).pause(0.1)
-
-    password_input = driver.find_element(By.XPATH, "//input[@name='password' and @type='password']")
-    actions.move_to_element(password_input).click(password_input).send_keys(password).pause(0.1)
-
-    login_button = driver.find_element(By.XPATH, "//input[@type='submit' and @value='Log in']")
-    actions.move_to_element(login_button).click(login_button).pause(0.1)
-
-    actions.perform()
+    email_xpath = "//input[@type='email']"
 
     # The check below confirms page loaded fully. Wait time set based on observation.
     max_wait_time = 30
     try:
         WebDriverWait(driver, max_wait_time).until(
             EC.presence_of_element_located(
-                (By.XPATH, "//span[@class='account-status-header-label' and contains(text(), 'Account value')]")
+                (By.XPATH, email_xpath)
+            )
+        )
+    except TimeoutException as err:
+        raise AuthError(f"Email element not found using xpath: {email_xpath} after waiting {max_wait_time} seconds.") from err
+    finally:
+        shot_storage.write(driver, ShotPath.BEFORE_LOGIN)
+
+    email_input = driver.find_element(By.XPATH, email_xpath)
+    actions.move_to_element(email_input).click(email_input).send_keys(email).pause(0.1)
+
+    password_input = driver.find_element(By.XPATH, "//input[@type='password']")
+    actions.move_to_element(password_input).click(password_input).send_keys(password).pause(0.1)
+
+    login_button = driver.find_element(By.XPATH, '//div[text()="Log in"]')
+    actions.move_to_element(login_button).click(login_button).pause(0.1)
+
+    actions.perform()
+
+    # The check below confirms page loaded fully. Wait time set based on observation.
+    try:
+        WebDriverWait(driver, max_wait_time).until(
+            EC.presence_of_element_located(
+                (By.XPATH, "//div[@data-testid='tab-button-home-open']")
             )
         )
     except TimeoutException as err:
         raise AuthError(f"Trading dashboard failed to load in {max_wait_time} seconds.") from err
     finally:
-        driver.save_screenshot(ShotPath.after_login.value)
+        shot_storage.write(driver, ShotPath.AFTER_LOGIN)
 
     return driver
 
@@ -289,12 +310,14 @@ def enforce_auth(func: Callable):
         except ConnectionError:
             is_auth = False
 
+        # TODO: Make it possible to turn off LocalAuthStorage
+        # TODO: Log when localstorage is being used and when browser is being used.
+        local_auth_storage = LocalAuthStorage()
+
         retries = 3
         while not is_auth and retries:
             retries -= 1
-            # TODO: Make it possible to turn off LocalAuthStorage
-            # TODO: Log when localstorage is being used and when browser is being used.
-            local_auth_storage = LocalAuthStorage()
+
             auth_data = local_auth_storage.read()
             if auth_data is None:
                 driver = Driver.load()
