@@ -6,7 +6,7 @@ from requests.sessions import Session
 from tradingTOT.schemas.api_responses import Position, SummarySchema
 from tradingTOT.exceptions import BrokerOrderError
 from tradingTOT.endpoints import (VALIDATE_URL, PLACE_ORDER_URL,
-                                  ORDER_COSTS_URL, TICKER_PRICE_URL, ACCOUNT_SUMMARY_URL,
+                                  ORDER_COSTS_URL, TICKER_PRICE_URL, TICKER_PRICE_URL_V2, ACCOUNT_SUMMARY_URL, ACCOUNT_SUMMARY_URL_SERVICES,
                                   ORDER_HISTORY, ALGOLIA_CONFIG_URL, ALGOLIA_SEARCH_URL)
 from tradingTOT.enums import OrderStatus, OrderType
 
@@ -207,14 +207,13 @@ class tradingTOT:
         Returns:
             Asking price data
         """
-        # The payload can take in multiple tickers like:
-        # [{"ticker":"TSLA_US_EQ","useAskPrice":true},{"ticker":"PLTR_US_EQ","useAskPrice":true}]
-        payload = [{"ticker":self._get_object_id(ticker), "useAskPrice":True}]
-        response = self.session.put(TICKER_PRICE_URL, json=payload).json()
-        if not isinstance(response, list):
+        object_id = self._get_object_id(ticker)
+        response = self.session.get(TICKER_PRICE_URL_V2.format(object_id=object_id)).json()
+        if not isinstance(response, dict) and not response.get("close", None):
             raise ValueError(f"The ticker {ticker} is invalid.")
 
-        return response[0].get("response")
+        response["price"] = response["close"]
+        return response
 
 
     @enforce_auth
@@ -288,7 +287,7 @@ class tradingTOT:
     @enforce_auth
     def get_account_details(self) -> Dict:
         """Get the value of assets in account."""
-        response = self.session.post(ACCOUNT_SUMMARY_URL, json=[]).json()
+        response = self.session.post(ACCOUNT_SUMMARY_URL_SERVICES, json=[]).json()
         details = {
             "cash": response.get("cash").get("freeForStocks"),
             "total": response.get("cash").get("total")
@@ -307,7 +306,7 @@ class tradingTOT:
     @enforce_auth
     def get_positions(self, tickers: Set[str]) -> List[Dict]:
         """Get position data from all tickers."""
-        response = self.session.post(ACCOUNT_SUMMARY_URL, json=[]).json()
+        response = self.session.post(ACCOUNT_SUMMARY_URL_SERVICES, json=[]).json()
         SummarySchema.model_validate(response)
         positions = []
 

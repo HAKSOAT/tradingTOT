@@ -3,7 +3,7 @@ from typing import Union, Dict, List
 import requests
 from requests.models import Response
 
-from tradingTOT.endpoints import AUTHENTICATE_URL, ACCOUNT_SUMMARY_URL
+from tradingTOT.endpoints import AUTHENTICATE_URL, ACCOUNT_SUMMARY_URL, ACCOUNT_SUMMARY_URL_SERVICES
 from tradingTOT.schemas.api_responses import SummarySchema, AfterOrderSchema
 from tradingTOT.utils.browser import enforce_auth
 
@@ -23,7 +23,7 @@ class ExistingOrdersHandler:
         """
         if not response:
             enforce_auth(lambda x: x)(self)
-            response = self.session.post(ACCOUNT_SUMMARY_URL, json=[]).json()
+            response = self.session.post(ACCOUNT_SUMMARY_URL_SERVICES, json=[]).json()
 
         if isinstance(response, requests.models.Response):
             response = response.json()

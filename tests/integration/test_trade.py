@@ -9,7 +9,7 @@ TRADINGTOT_URLS = ["https://live.trading212.com/", "https://demo.trading212.com/
 TICKER = "MSFT"
 
 
-def test_buy_order_workflow(driver):
+def test_buy_order_workflow(driver, test_env):
     tradingtot = tradingTOT()
 
     account_details = tradingtot.get_account_details()
