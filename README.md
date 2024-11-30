@@ -1,5 +1,8 @@
 # TradingTOT
 
+> [!CAUTION]
+> This project is no longer maintained as Trading212 has implemented a lot of breaking changes to their platform diverging from the original design which this repo is based on. The project is left here for reference purposes only.
+
 ## Introduction
 TradingTOT provides a Python-based solution for automating trading activities on Trading212. 
 It leverages Selenium for web scraping and automation to interact with the trading platform, offering functionalities such as login automation and trade execution. 
@@ -93,6 +96,9 @@ On MacOS: `/Applications/Google Chrome.app`
 
 You do not have to worry about the webdriver as Selenium 4 handles driver downloads itself.
 
+## Other Implementations
+
+- [Trading 212 API for TypeScript](https://github.com/bennycode/trading212-api) for Node.js use cases.
 
 ## Disclaimer
 This project is not officially affiliated with Trading212 or any other trading platform. It is developed as an independent tool to assist users in automating their trading strategies. Use at your own risk and discretion.
